@@ -1,9 +1,14 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
-<html lang="ru">
+<html>
     <head>
-        <meta http-equiv=Content-Type content="text/html; charset=windows-1251">
-        <title>[% title %] [% subtitle %]</title>
+        <title>
+        [% IF toc %]
+            &#1051;.&#1053;.&#1058;&#1086;&#1083;&#1089;&#1090;&#1086;&#1081;. &#1057;&#1086;&#1073;&#1088;. &#1089;&#1086;&#1095;. &#1074; 22 &#1090;. &#1058;.10. &#1057;&#1086;&#1076;&#1077;&#1088;&#1078;&#1072;&#1085;&#1080;&#1077;
+        [% ELSE %]
+            [% title %] [% subtitle %]
+        [% END %]
+        </title>
     </head>
     <body style="font-size:4em">
         [% paragraphs %]

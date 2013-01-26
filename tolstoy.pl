@@ -11,7 +11,7 @@ use Template;
 
 my $OUTPUT_PATH = '/var/www/tolstoy';
 
-my $CHAPTERS_DIR = './01text/vol_10/01text';
+my $CHAPTERS_DIR = './tolstoy/01text/vol_10/01text';
 
 my $TOC_FILENAME = 'index.htm';
 
@@ -51,62 +51,35 @@ sub inner_page_navigation {
     
     my $anchor_forth = $anchor_iterator+1;
     
-    my $navigation = <<"END";
-            
-        </p>
-        <table style="width:100%;text-align:center">
-            <tr>
-                <td style="width:33%;background-color:#ddd;display:block;float:left">
-                    <a href="#$anchor_back">
-                        <div style="width:100%;height:100%">back</div>
-                    </a>
-                </td>
-                <td style="width:33%;background-color:#eee;display:block;float:left">
-                    <a href="$TOC_FILENAME">
-                        <div style="width:100%;height:100%">toc</div>
-                    </a>
-                </td>
-                <td style="width:33%;background-color:#ddd;display:block;float:left">
-                    <a href="#$anchor_forth">
-                        <div style="width:100%;height:100%">forth</div>
-                    </a>
-                </td>
-            </tr>
-        </table>
-        <p>
-
-END
+    my $navigation;
+    
+    my $template_filename = 'tolstoy_inner_page_navigation.tt';
+    
+    my $vars_href = {'anchor_back' => $anchor_back, 'toc_filename' => $TOC_FILENAME, 'anchor_forth' => $anchor_forth,};
+    
+    my $template = Template->new();
+    $template->process($template_filename, $vars_href, \$navigation);
      
     return $navigation;
 }
 
 sub between_pages_navigation {
+    
     my $filename = shift;
     
-    my $navigation = <<"END";
-            
-        <table style="width:100%;text-align:center">
-            <tr>
-                <td style="width:33%;background-color:#ddd;display:block;float:left">
-                    <a href="$NEIGHBOURS_FOR_FILE{$filename}{'previous'}">
-                        <div style="width:100%;height:100%">previous story</div>
-                    </a>
-                </td>
-                <td style="width:33%;background-color:#eee;display:block;float:left">
-                    <a href="$TOC_FILENAME">
-                        <div style="width:100%;height:100%">toc</div>
-                    </a>
-                </td>
-                <td style="width:33%;background-color:#ddd;display:block;float:left">
-                    <a href="$NEIGHBOURS_FOR_FILE{$filename}{'next'}">
-                        <div style="width:100%;height:100%">next story</div>
-                    </a>
-                </td>
-            </tr>
-        </table>
-
-END
-     
+    my $navigation;
+    
+    my $template_filename = 'tolstoy_between_pages_navigation.tt';
+    
+    my $vars_href = {
+        'previous' => $NEIGHBOURS_FOR_FILE{$filename}{'previous'},
+        'toc_filename' => $TOC_FILENAME,
+        'next' => $NEIGHBOURS_FOR_FILE{$filename}{'next'},
+    };
+    
+    my $template = Template->new();
+    $template->process($template_filename, $vars_href, \$navigation);
+    
     return $navigation;
 }
 
@@ -120,13 +93,14 @@ sub make_toc {
     
     my $links_string = join("\n", '<table>', @chapter_links, '</table>');
     
-    print_html({'filename' => $TOC_FILENAME, 'title' => 'Ë.Í.Òîëñòîé. Ñîáð. ñî÷. â 22 ò. ', 'subtitle' => 'Ò.10. Ñîäåðæàíèå', 'paragraphs_string' => $links_string});
+    print_html({'filename' => $TOC_FILENAME, 'toc' => 1, 'paragraphs_string' => $links_string});
 }
 
 sub print_html {
     my ($arg_href) = @_;
     my $title = $arg_href->{'title'} || '';
     my $subtitle = $arg_href->{'subtitle'} || '';
+    my $toc = $arg_href->{'toc'} || '';
     my $paragraphs_string = $arg_href->{'paragraphs_string'} or die 'Argument paragraphs_string is mandatory.' . Dumper $arg_href;
     my $between_pages_navigation = $arg_href->{'between_pages_navigation'} || '';
     
@@ -134,7 +108,13 @@ sub print_html {
     
     my $output_filename = $arg_href->{'filename'} or die 'Argument filename is mandatory.';
     
-    my $vars_href = {'title' => $title, 'subtitle' => $subtitle, 'paragraphs' => $paragraphs_string, 'between_pages_navigation' => $between_pages_navigation,};
+    my $vars_href = {
+        'title' => $title,
+        'subtitle' => $subtitle, 
+        'paragraphs' => $paragraphs_string, 
+        'between_pages_navigation' => $between_pages_navigation,
+        'toc' => $toc,
+    };
     
     my $template = Template->new({OUTPUT_PATH => $OUTPUT_PATH});
     $template->process($template_filename, $vars_href, $output_filename);
@@ -150,6 +130,7 @@ sub main {
         
         foreach my $line (read_file( "$CHAPTERS_DIR/$chapter_file" )) {
             $title = $1 if $line =~ /<h1>(.+)<?/;
+            $title =~ s/<.+//g if $title; # strip <br>
             $subtitle = $1 if $line =~ /class="subhead"><i>(.+)<\/i>/;
             push(@paragraphs, $1) if $line =~ /<p id="p.+">(.+)</;
             $paragraphs[$#paragraphs] .= $1 if $line =~ /<p class="continuation">(.+)</;
@@ -161,7 +142,7 @@ sub main {
         @paragraphs = map { "<p>$_</p>" } @paragraphs;
         my $paragraphs_concatted_string = join(' ', @paragraphs);
         
-        # Insert after each 650 characters a navigation bar. Regardless
+        # Insert after each n characters a navigation bar. Regardless
         # the paragraph boundaries.
         my $max_characters = 300;
         my $characters_amount;
@@ -173,7 +154,6 @@ sub main {
             $characters_amount += length($word);
             if ($characters_amount >= $max_characters) {
                 $paragraphs_concatted_string_with_navigation .= inner_page_navigation($anchor_iterator);
-                $paragraphs_concatted_string_with_navigation .= q[<span id="] .($anchor_iterator+1). q["></span>];
                 $anchor_iterator++;
                 $characters_amount = 0;
             }
